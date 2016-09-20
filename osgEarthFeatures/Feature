@@ -1,0 +1,168 @@
+/* -*-c++-*- */
+/* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
+ * Copyright 2008-2010 Pelican Mapping
+ * http://osgearth.org
+ *
+ * osgEarth is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
+#ifndef OSGEARTHFEATURES_FEATURE_H
+#define OSGEARTHFEATURES_FEATURE_H 1
+
+#include <osgEarthFeatures/Common>
+#include <osgEarthSymbology/Geometry>
+#include <osgEarthSymbology/Style>
+#include <osgEarth/SpatialReference>
+#include <osg/Array>
+#include <map>
+#include <list>
+
+namespace osgEarth { namespace Features
+{
+    using namespace osgEarth;
+    using namespace osgEarth::Symbology;
+
+    /**
+     * Metadata and schema information for feature data.
+     */
+    class OSGEARTHFEATURES_EXPORT FeatureProfile : public osg::Referenced
+    {
+    public:        
+        FeatureProfile( const GeoExtent& extent );
+
+        /** Gets the spatial extents of the features in this profile. */
+        const GeoExtent& getExtent() const {
+            return _extent; }
+
+        /** Gets the spatial reference system of feature shapes in this class. */
+        const SpatialReference* getSRS() const {
+            return _extent.getSRS(); }
+
+        bool getTiled() const;
+        void setTiled(bool tiled);
+
+        int getFirstLevel() const;
+        void setFirstLevel(int firstLevel );
+
+        int getMaxLevel() const;
+        void setMaxLevel(int maxLevel);
+
+        const osgEarth::Profile* getProfile() const;
+        void setProfile( const osgEarth::Profile* profile );
+
+    protected:
+        osg::ref_ptr< const osgEarth::Profile > _profile;
+        GeoExtent _extent;
+        bool _tiled;
+        int _firstLevel;
+        int _maxLevel;
+    };
+
+    struct AttributeValueUnion
+    {
+        std::string stringValue;
+        double      doubleValue;
+        int         intValue;
+        bool        boolValue;
+    };
+
+    enum AttributeType
+    {
+        ATTRTYPE_UNSPECIFIED,
+        ATTRTYPE_STRING,
+        ATTRTYPE_INT,
+        ATTRTYPE_DOUBLE,
+        ATTRTYPE_BOOL
+    };
+
+    struct OSGEARTHFEATURES_EXPORT AttributeValue : public std::pair<AttributeType,AttributeValueUnion>
+    {
+        std::string getString() const;
+        double getDouble( double defaultValue =0.0 ) const;
+        int getInt( int defaultValue =0 ) const;
+        bool getBool( bool defaultValue =false ) const;
+    };
+
+    typedef std::map<std::string, AttributeValue> AttributeTable;
+
+    typedef unsigned long FeatureID;
+
+    typedef std::map< std::string, AttributeType > FeatureSchema;
+
+    /**
+     * Basic building block of vector feature data.
+     */
+    class OSGEARTHFEATURES_EXPORT Feature : public osg::Object
+    {
+    public:
+        Feature( FeatureID fid =0L );
+
+        Feature( Geometry* geom, const Style& style =Style(), FeatureID fid =0L );
+
+        /** Copy contructor */
+        Feature( const Feature& rhs, const osg::CopyOp& copyop =osg::CopyOp::DEEP_COPY_ALL );
+
+        META_Object( osgEarthFeatures, Feature );
+
+    public:
+
+        FeatureID getFID() const;
+
+        void setGeometry( Symbology::Geometry* geom ) { _geom = geom; }
+
+        Symbology::Geometry* getGeometry() { return _geom.get(); }
+
+        const Symbology::Geometry* getGeometry() const { return _geom.get(); }
+
+        const AttributeTable& getAttrs() const { return _attrs; }
+
+        void set( const std::string& name, const std::string& value );
+        void set( const std::string& name, double value );
+        void set( const std::string& name, int value );
+        void set( const std::string& name, bool value );
+
+        bool hasAttr( const std::string& name ) const;
+
+        std::string getString( const std::string& name ) const;
+        double getDouble( const std::string& name, double defaultValue =0.0 ) const;
+        int getInt( const std::string& name, int defaultValue =0 ) const;
+        bool getBool( const std::string& name, bool defaultValue =false ) const;
+
+        /** Embedded style. */
+        optional<Style>& style() { return _style; }
+        const optional<Style>& style() const { return _style; }
+
+        /** Geodetic interpolation method. */
+        optional<GeoInterpolation>& geoInterp() { return _geoInterp; }
+        const optional<GeoInterpolation>& geomInterp() const { return _geoInterp; }
+
+        /** populates the variables of an expression with attribute values and evals the expression. */
+        double eval( NumericExpression& expr ) const;
+        
+        /** populates the variables of an expression with attribute values and evals the expression. */
+        const std::string& eval( StringExpression& expr ) const;
+
+    protected:
+        FeatureID                         _fid;
+        osg::ref_ptr<Symbology::Geometry> _geom;
+        AttributeTable                    _attrs;
+        optional<Style>                   _style;
+        optional<GeoInterpolation>        _geoInterp;
+    };
+
+    typedef std::list< osg::ref_ptr<Feature> > FeatureList;
+
+} } // namespace osgEarth::Features
+
+#endif // OSGEARTHFEATURES_FEATURE_H

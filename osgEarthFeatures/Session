@@ -1,0 +1,124 @@
+/* -*-c++-*- */
+/* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
+ * Copyright 2008-2010 Pelican Mapping
+ * http://osgearth.org
+ *
+ * osgEarth is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
+#ifndef OSGEARTH_FEATURES_SESSION_H
+#define OSGEARTH_FEATURES_SESSION_H 1
+
+#include <osgEarthFeatures/Common>
+#include <osgEarthSymbology/ResourceCache>
+#include <osgEarthSymbology/Style>
+#include <osgEarth/ThreadingUtils>
+#include <osgEarth/Map>
+
+namespace osgEarth { namespace Features
+{
+    using namespace osgEarth;
+    using namespace osgEarth::Symbology;
+
+    /**
+     * Session is a state object that exists throughout the life of one or more related
+     * feature compilations.
+     *
+     * A Session holds shared, re-usable data elements that can be accessed through a 
+     * FilterContext.
+     *
+     * Whereas a FilterContext exists thoughout the life of a single compilation, a Session
+     * exists one level above this and governs any number of "related" compilations
+     * (e.g., the compilation of many grid cells comprising a single feature layer).
+     *
+     * Session implements the URIResolver interface to resolve relative URIs.
+     */
+    class OSGEARTHFEATURES_EXPORT Session : public osg::Referenced
+    {
+    public:
+        /**
+         * Constructs a new Session that is tied to a map
+         */
+        Session( const Map* map, StyleSheet* styles =0L );
+
+        /**
+         * URI Context for relative path resolution.
+         */
+        void setURIContext( const URIContext& value ) { _uriContext = value; }
+        const URIContext& uriContext() const { return _uriContext; }
+
+        /**
+         * Gets the underlying map (frame) interface in this session
+         */
+        MapFrame createMapFrame( Map::ModelParts parts =Map::TERRAIN_LAYERS ) const;
+
+        /**
+         * Gets the map information backing up this session.
+         */
+        const MapInfo& getMapInfo() const { return _mapInfo; }
+
+        /** The style sheet governing this session. */
+        void setStyles( StyleSheet* value );
+        StyleSheet* styles() const { return _styles.get(); }
+
+        ///** Session-global resource cache. Careful. */
+        //ResourceCache* resourceCache() { return _resourceCache.get(); }
+        //const ResourceCache* resourceCache() const { return _resourceCache.get(); }
+
+    public: // URIResolver
+        
+        /**
+         * Resolves a URI based on the reference URI. You can use this method
+         * to create an absolute URI from a relative one, for example.
+         */
+        //std::string resolveURI( const std::string& inputURI ) const;
+
+    public:
+        /**
+         * Stores an object in the shared Session cache.
+         *
+         * WARNING! Don't store things like nodes in here unless you plan
+         * to clone them. This is a multi-threaded store.
+         */
+        void putObject( const std::string& key, osg::Referenced* object );
+
+        /**
+         * Gets an object from the shared Session cache.
+         */
+        template<typename T> T* getObject( const std::string& key ) {
+            Threading::ScopedReadLock lock( _objMapMutex );
+            ObjectMap::const_iterator i = _objMap.find(key);
+            return i != _objMap.end() ? dynamic_cast<T*>( i->second.get() ) : 0L;
+        }
+
+        void removeObject( const std::string& key );
+
+    private:
+
+        //osg::ref_ptr<ResourceCache> _resourceCache;
+
+        typedef std::map<std::string, osg::ref_ptr<osg::Referenced> > ObjectMap;
+        ObjectMap                    _objMap;
+        Threading::ReadWriteMutex    _objMapMutex;
+
+        URIContext                     _uriContext;
+        osg::ref_ptr<const Map>        _map;
+        MapInfo                        _mapInfo;
+        //std::string                    _referenceURI;
+        osg::ref_ptr<StyleSheet>       _styles;
+    };
+
+} }
+
+#endif // OSGEARTH_FEATURES_SESSION_H
